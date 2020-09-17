@@ -14,7 +14,7 @@ public static string CLIENT_SECRET      = Environment.GetEnvironmentVariable("CL
 public static string ADMIN_USERNAME     = Environment.GetEnvironmentVariable("ADMIN_USERNAME");
 public static string ADMIN_PASSWORD     = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
 public static string AUTHCODE_URI       = Environment.GetEnvironmentVariable("AUTHCODE_URI");
-public static string EVENT_URI          = Environment.GetEnvironmentVariable("EVENT_URI");
+public static string EVENT_URI          = Environment.GetEnvironmentVariable("EVENT_URI"); 
 
 public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
 {
@@ -25,30 +25,40 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
         case "GET":
         {
             log.LogInformation("C# HTTP trigger function processed a GET request.");
-            string AuthCode = req.Query["code"];
-            string State = req.Query["state"];
+            string AuthCode = "";
+            string State = "";
+            AuthCode = req.Query["code"];
+            State = req.Query["state"];
 
-            try{
-                string resp = await PostAuthCodeToBCAsync(JsonConvert.SerializeObject(new { code = AuthCode ,state = State}),log);
-                dynamic respData = JsonConvert.DeserializeObject(resp);
-                string responseStringMessage = "";
-                switch(respData?.value.ToString())
-                {
-                    case "OK": 
-                        responseStringMessage = "Authorization successfully pased. You can close this tab.";
-                        break;
-                    case "FAILED": 
-                        responseStringMessage = "Authorization failed. You can close this tab.";
-                        break; 
-
-                }
-                return new OkObjectResult(responseStringMessage);
-            }
-            catch(Exception ex)
+            if(AuthCode != null && State != null)
             {
-                return new BadRequestObjectResult(ex.Message); 
-            }
+                string resp = "";
+                try{
+                    resp = await PostAuthCodeToBCAsync(JsonConvert.SerializeObject(new { code = AuthCode ,state = State}),log);
+                    log.LogInformation(resp);
+                    dynamic respData = JsonConvert.DeserializeObject(resp);
+                    string responseStringMessage = "";
+                    switch(respData?.value.ToString())
+                    {
+                        case "OK": 
+                            responseStringMessage = "Authorization successfully pased. You can close this tab.";
+                            break; 
+                        case "FAILED":
+                            responseStringMessage = "Authorization failed. You can close this tab.";
+                            break; 
 
+                    }
+                    return new OkObjectResult(responseStringMessage);
+                }
+                catch(Exception ex) 
+                {
+                    return new BadRequestObjectResult(ex.Message + ": " + resp); 
+                }
+            }
+            else
+            {
+                return new BadRequestObjectResult("Authorization denied. You chose to deny access to the app.");
+            }
             break;
         }
         case "POST" :  
