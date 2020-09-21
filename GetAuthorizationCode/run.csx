@@ -41,10 +41,10 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
                     switch(respData?.value.ToString())
                     {
                         case "OK": 
-                            responseStringMessage = "Authorization successfully pased. You can close this tab.";
+                            responseStringMessage = "Authorization successfully passed. Please update Square Settings page. You can close this tab.";
                             break; 
                         case "FAILED":
-                            responseStringMessage = "Authorization failed. You can close this tab.";
+                            responseStringMessage = "Authorization failed. Failed to retrieve access token. You can close this tab.";
                             break; 
 
                     }
@@ -65,13 +65,12 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
         {
             log.LogInformation("C# HTTP trigger function processed a POST request.");
             try{
-                string documentContents = "test";
+                string documentContents = "{\"key1\":\"value\"}";
 
-                string resp = await PostEventToBCAsync(documentContents, log);
+                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
 
-
-
-
+                string resp = await PostEventToBCAsync(JsonConvert.SerializeObject(new { inputJson = requestBody}), log);
+log.LogInformation(resp);
                 return new OkObjectResult(resp);
             }
             catch(Exception ex)
@@ -95,7 +94,7 @@ public static async Task<string> PostEventToBCAsync(string jsonBody, ILogger log
     var data = new StringContent(jsonBody, Encoding.UTF8, "application/json");
     string postUri = $"https://api.businesscentral.dynamics.com/v2.0/{AAD_TENANTID}/{ENVIRONMENT_NAME}/{EVENT_URI}";
     log.LogInformation(postUri);
-    log.LogInformation(data.ToString());
+    log.LogInformation(jsonBody);
     var response = await client.PostAsync(postUri, data);
     var responseString = await response.Content.ReadAsStringAsync(); 
     return responseString; 
