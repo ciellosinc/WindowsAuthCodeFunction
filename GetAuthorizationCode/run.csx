@@ -41,7 +41,7 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
                     switch(respData?.value.ToString())
                     {
                         case "OK": 
-                            responseStringMessage = "Authorization successfully passed. Please update Square Settings page. You can close this tab.";
+                            responseStringMessage = "Authorization successfully passed. Please refresh the Square Settings page in Business Central. You can close this tab.";
                             break; 
                         case "FAILED":
                             responseStringMessage = "Authorization failed. Failed to retrieve access token. You can close this tab.";
