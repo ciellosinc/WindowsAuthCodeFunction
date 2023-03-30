@@ -6,20 +6,17 @@ using System.Net.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives; 
 using Newtonsoft.Json;
+using System;
 
-public static string AAD_TENANTID       = Environment.GetEnvironmentVariable("AAD_TENANTID");
-public static string ENVIRONMENT_NAME   = Environment.GetEnvironmentVariable("ENVIRONMENT_NAME");
-public static string CLIENT_ID          = Environment.GetEnvironmentVariable("CLIENT_ID");
-public static string CLIENT_SECRET      = Environment.GetEnvironmentVariable("CLIENT_SECRET");
-public static string ADMIN_USERNAME     = Environment.GetEnvironmentVariable("ADMIN_USERNAME");
-public static string ADMIN_PASSWORD     = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
-public static string AUTHCODE_URI       = Environment.GetEnvironmentVariable("AUTHCODE_URI");
-public static string EVENT_URI          = Environment.GetEnvironmentVariable("EVENT_URI"); 
+public static string ADMIN_DOMAIN      = Environment.GetEnvironmentVariable("ADMIN_DOMAIN");
+public static string ADMIN_USERNAME    = Environment.GetEnvironmentVariable("ADMIN_USERNAME");
+public static string ADMIN_PASSWORD    = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
+public static string BASE_URI          = Environment.GetEnvironmentVariable("BASE_URI");
+public static string COMPANY_ID        = Environment.GetEnvironmentVariable("COMPANY_ID"); 
 
 public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
 {
     HttpClient client = new HttpClient();
-
     switch(req.Method)
     {
         case "GET":
@@ -46,7 +43,6 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
                         case "FAILED":
                             responseStringMessage = "Authorization failed. Failed to retrieve access token. You can close this tab.";
                             break; 
-
                     }
                     return new OkObjectResult(responseStringMessage);
                 }
@@ -65,12 +61,9 @@ public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
         {
             log.LogInformation("C# HTTP trigger function processed a POST request.");
             try{
-                string documentContents = "{\"key1\":\"value\"}";
-
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-
                 string resp = await PostEventToBCAsync(JsonConvert.SerializeObject(new { inputJson = requestBody}), log);
-log.LogInformation(resp);
+                log.LogInformation(resp);
                 return new OkObjectResult(resp);
             }
             catch(Exception ex)
@@ -84,60 +77,36 @@ log.LogInformation(resp);
             return new BadRequestObjectResult($"HTTPMethod {req.Method} is not supported!"); 
         }
     }
-    
 }
 
 public static async Task<string> PostEventToBCAsync(string jsonBody, ILogger log)
 {
-    HttpClient client = new HttpClient(); 
-    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {await GetBearerTokenAsync()}");
+    string postUri = $"{BASE_URI}/SquareOAuthService_GetSquareWebhookRequest?company={COMPANY_ID}";
+    var uri = new Uri (postUri);
+    var credentialsCache = new CredentialCache();
+    credentialsCache.Add(uri, "NTLM", new NetworkCredential(ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_DOMAIN));
+    var handler = new HttpClientHandler() { Credentials = credentialsCache, PreAuthenticate = true };
+    var client = new HttpClient(handler) { Timeout = new TimeSpan(0, 0, 10) };
     var data = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-    string postUri = $"https://api.businesscentral.dynamics.com/v2.0/{AAD_TENANTID}/{ENVIRONMENT_NAME}/{EVENT_URI}";
-    log.LogInformation(postUri);
-    log.LogInformation(jsonBody);
-    var response = await client.PostAsync(postUri, data);
+    log.LogInformation($"Sending request to {postUri}");
+    log.LogInformation($"Sending request body: {data.ReadAsStringAsync().Result}");
+    var response = await client.PostAsync(uri, data);
     var responseString = await response.Content.ReadAsStringAsync(); 
     return responseString; 
 }
+
 public static async Task<string> PostAuthCodeToBCAsync(string jsonBody, ILogger log)
 {
-    HttpClient client = new HttpClient(); 
-    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {await GetBearerTokenAsync()}");
+    string postUri = $"{BASE_URI}/SquareOAuthService_GetAuthorizationCode?company={COMPANY_ID}";
+    var uri = new Uri (postUri);
+    var credentialsCache = new CredentialCache();
+    credentialsCache.Add(uri, "Negotiate", new NetworkCredential(ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_DOMAIN));
+    var handler = new HttpClientHandler() { Credentials = credentialsCache, PreAuthenticate = true };
+    var client = new HttpClient(handler) { Timeout = new TimeSpan(0, 0, 10) };
     var data = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-    string postUri = $"https://api.businesscentral.dynamics.com/v2.0/{AAD_TENANTID}/{ENVIRONMENT_NAME}/{AUTHCODE_URI}";
-    log.LogInformation(postUri);
-    log.LogInformation(data.ReadAsStringAsync().Result);
-    var response = await client.PostAsync(postUri, data);
+    log.LogInformation($"Sending request to {postUri}");
+    log.LogInformation($"Sending request body: {data.ReadAsStringAsync().Result}");
+    var response = await client.PostAsync(uri, data);
     var responseString = await response.Content.ReadAsStringAsync();
     return responseString; 
-}
-
-public static async Task<string> GetBearerTokenAsync()
-{
-    HttpClient client = new HttpClient();
-
-    client.DefaultRequestHeaders.Add("Authorization", $"Basic {EncodeTo64(CLIENT_ID + ":" + CLIENT_SECRET)}");
-    var grantValues = new Dictionary<string, string>
-    {
-        { "grant_type", "password" },
-        { "username", ADMIN_USERNAME },
-        { "password", ADMIN_PASSWORD },
-        { "resource", "https://api.businesscentral.dynamics.com/" }
-    };
-
-    var grantContent = new FormUrlEncodedContent(grantValues); 
-
-    var response = await client.PostAsync($"https://login.windows.net/{AAD_TENANTID}/oauth2/token", grantContent);
-
-    var responseString = await response.Content.ReadAsStringAsync();
-    dynamic TokenData = JsonConvert.DeserializeObject(responseString);
-
-    return TokenData != null ? TokenData?.access_token : "";
-}
-
-public static string EncodeTo64(string toEncode)
-{
-    byte[] toEncodeAsBytes = System.Text.ASCIIEncoding.ASCII.GetBytes(toEncode);
-    string returnValue = System.Convert.ToBase64String(toEncodeAsBytes);
-    return returnValue;
 }
