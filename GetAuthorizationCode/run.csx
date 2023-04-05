@@ -100,7 +100,7 @@ public static async Task<string> PostAuthCodeToBCAsync(string jsonBody, ILogger 
     string postUri = $"{BASE_URI}/SquareOAuthService_GetAuthorizationCode?company={COMPANY_ID}";
     var uri = new Uri (postUri);
     var credentialsCache = new CredentialCache();
-    credentialsCache.Add(uri, "Negotiate", new NetworkCredential(ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_DOMAIN));
+    credentialsCache.Add(uri, "NTLM", new NetworkCredential(ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_DOMAIN));
     var handler = new HttpClientHandler() { Credentials = credentialsCache, PreAuthenticate = true };
     var client = new HttpClient(handler) { Timeout = new TimeSpan(0, 0, 10) };
     var data = new StringContent(jsonBody, Encoding.UTF8, "application/json");
